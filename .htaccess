@@ -1,0 +1,12 @@
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+RewriteCond %{THE_REQUEST} \.php
+RewriteRule \.php$ - [R=404,L]
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set X-Xss-Protection "1; mode=block"
+Header always set X-Content-Type-Options "nosniff"
+Header set Content-Security-Policy "script-src 'self'"
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+</IfModule>
