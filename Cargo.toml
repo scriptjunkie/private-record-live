@@ -1,0 +1,19 @@
+[package]
+name = "rcrdr"
+version = "0.1.0"
+authors = ["scriptjunkie"]
+edition = "2018"
+
+[profile.release]
+panic = 'abort'
+lto = true
+
+[dependencies]
+env_logger = "0.5"
+rustls = "0.16"
+actix-web = { version = "2", features=["rustls"] }
+actix-multipart = "0"
+actix-files = "0.2.1"
+actix-rt = "1"
+chrono = "0"
+futures = "0"
