@@ -4,7 +4,7 @@ Based on https://raw.githubusercontent.com/muaz-khan/RecordRTC/
 
 # Deployment - standalone
 ## Get the binary
-Download a release file from the release pages
+Download a release file from the [release pages](https://github.com/scriptjunkie/private-record-live/releases)
 
 OR
 
