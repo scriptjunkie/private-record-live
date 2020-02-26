@@ -9,7 +9,7 @@ use std::io::Write;
 use actix_multipart::Multipart;
 use actix_files::Files;
 use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
-use rustls::internal::pemfile::{certs, rsa_private_keys};
+use rustls::internal::pemfile::{certs, rsa_private_keys, pkcs8_private_keys};
 use rustls::{NoClientAuth, ServerConfig};
 use futures::StreamExt;
 use std::fs::OpenOptions;
@@ -100,7 +100,10 @@ async fn main() -> std::io::Result<()> {
     let cert_file = &mut BufReader::new(File::open("cert.pem").unwrap());
     let key_file = &mut BufReader::new(File::open("key.pem").unwrap());
     let cert_chain = certs(cert_file).unwrap();
-    let mut keys = rsa_private_keys(key_file).unwrap();
+    let mut keys = rsa_private_keys(key_file).or_else(|_|{
+            let key_file2 = &mut BufReader::new(File::open("key.pem").unwrap());
+            pkcs8_private_keys(key_file2)
+        }).unwrap();
     config.set_single_cert(cert_chain, keys.remove(0)).unwrap();
 
     HttpServer::new(|| {
