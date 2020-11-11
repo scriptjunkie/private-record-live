@@ -74,9 +74,9 @@ by Matthew Weeks 2020-02-20 Built on work by...
         .recordrtc select {
             font-size: 17px;
         }
-		#btn-start-recording {
-		    padding: 40px;
-		}
+        #btn-start-recording {
+            padding: 40px;
+        }
     </style>
 
     <script src="RecordRTC.js"></script>
@@ -114,7 +114,7 @@ by Matthew Weeks 2020-02-20 Built on work by...
                     <option>whammy</option>
                     <option>WebAssembly</option>
                 </select>
-				<a href="ls">Previous Recordings</a>
+                <a href="ls">Previous Recordings</a>
 
                 <hr style="border-top: 0;border-bottom: 1px solid rgb(189, 189, 189);margin: 4px -12px;margin-top: 8px;">
                 <select class="media-resolutions">
@@ -196,6 +196,20 @@ by Matthew Weeks 2020-02-20 Built on work by...
         </script>
 
         <script>
+            caches.open("vidcache").then(function(cache){
+                window.myvidcache = cache;
+                console.log("opened cache");
+                cache.keys().then(function(keys) {
+                    vids = {};
+                    keys.forEach(function(request, index, array) {
+                        let u = request.url;
+                        let parts = u.split("/");
+                        vids[parts[parts.length - 2]] = 1;
+                        //don't do this! cache.delete(request);
+                    });
+                    console.log("found videos", vids, "from", keys.length, "keys");
+                });
+            });
             var video = document.createElement('video');
             video.controls = false;
             var mediaElement = getHTMLMediaElement(video, {
@@ -424,7 +438,7 @@ by Matthew Weeks 2020-02-20 Built on work by...
 
                 //if(recordingMedia.value === 'record-audio-plus-video') {
                     captureAudioPlusVideo(commonConfig);
-					window.fileName = getFileName(fileExtension);
+                    window.fileName = getFileName(fileExtension);
 
                     button.mediaCapturedCallback = function() {
                         if(typeof MediaRecorder === 'undefined') { // opera or chrome etc.
@@ -519,11 +533,13 @@ by Matthew Weeks 2020-02-20 Built on work by...
                         if(typeof MediaRecorder !== 'undefined') {
                             options.timeSlice = 1000;
                             button.blobs = [];
+                            window.fileOffset = 0;
                             options.ondataavailable = function(blob) {
-								console.log("Uploading chunk len ", blob.size);
-								uploadToPHPServer(window.fileName, blob, 'up');//Send to PHP
-								var intrcrdr = button.recordRTC.getInternalRecorder();
-								intrcrdr.getArrayOfBlobs().pop(); //drop it so we don't keep burning memory
+                                console.log("Uploading chunk len ", blob.size);
+                                uploadToPHPServer(window.fileName, blob, 'up', window.fileOffset);//Send to PHP
+                                window.fileOffset += blob.size;
+                                var intrcrdr = button.recordRTC.getInternalRecorder();
+                                intrcrdr.getArrayOfBlobs().pop(); //drop it so we don't keep burning memory
                             };
                         }
 
@@ -531,9 +547,9 @@ by Matthew Weeks 2020-02-20 Built on work by...
                         button.recordRTC = RecordRTC(button.stream, options);
 
                         button.recordingEndedCallback = function(url) {
-							console.log("recording ended");
+                            console.log("recording ended");
                         };
-						console.log("Starting recording");
+                        console.log("Starting recording");
                         button.recordRTC.startRecording();
                     };
                 //}
@@ -585,8 +601,8 @@ by Matthew Weeks 2020-02-20 Built on work by...
                 if(value == 'default') {
                     return mediaConstraints;
                 }
-				mediaConstraints.video.frameRate = parseInt(value);
-				return mediaConstraints;
+                mediaConstraints.video.frameRate = parseInt(value);
+                return mediaConstraints;
             }
 
             function setGetFromLocalStorage(selectors) {
@@ -631,9 +647,9 @@ by Matthew Weeks 2020-02-20 Built on work by...
                 defaultWidth = parseInt(value[0]);
                 defaultHeight = parseInt(value[1]);
 
-				mediaConstraints.video.width = defaultWidth;
-				mediaConstraints.video.height = defaultHeight;
-				return mediaConstraints;
+                mediaConstraints.video.width = defaultWidth;
+                mediaConstraints.video.height = defaultHeight;
+                return mediaConstraints;
             }
 
             function captureUserMedia(mediaConstraints, successCallback, errorCallback) {
@@ -657,7 +673,7 @@ by Matthew Weeks 2020-02-20 Built on work by...
                     successCallback(stream);
                     setVideoURL(stream, true);
                 }).catch(function(error) {
-					console.log(mediaConstraints,error);
+                    console.log(mediaConstraints,error);
                     if(error && (error.name === 'ConstraintNotSatisfiedError' || error.name === 'OverconstrainedError')) {
                         alert('Your camera or browser does NOT supports selected resolutions or frame-rates. \n\nPlease select "default" resolutions.');
                     }
@@ -785,23 +801,48 @@ by Matthew Weeks 2020-02-20 Built on work by...
                 };
             }
 
-            function uploadToPHPServer(fileName, blob, url) {
+            //uploads and saves locally if possible
+            function uploadToPHPServer(fileName, blob, url, offset) {
                 var blob = new File([blob], fileName, {
                     type: mimeType
                 });
+                //cache locally
+                if(!window.myvidcache){
+                    caches.open("vidcache").then(function(cache){
+                        cache.put(new Request('/vidparts/'+fileName+'/'+offset),  new Response(blob,{"status": 200}));
+                        window.myvidcache = cache;
+                        console.log("caching",fileName,"offset",offset);
+                    });
+                }else{
+                    window.myvidcache.put(new Request('/vidparts/'+fileName+'/'+offset),  new Response(blob,{"status": 200}));
+                    console.log("caching",fileName,"offset",offset);
+                }
                 // create FormData
                 var formData = new FormData();
                 formData.append('video-filename', fileName);
+                formData.append('video-offset', offset);
                 formData.append('video-blob', blob);
-				//Create XHR
+                if(!window.inflight){
+                    window.inflight = 0; //make sure it's a number
+                }else if(window.inflight > 20){
+                    console.log("UPLOAD BACKLOG",window.inflight, "INFLIGHT");
+                    return;
+                }
+                //Create XHR
                 var request = new XMLHttpRequest();
                 request.onreadystatechange = function() {
-                    if (request.readyState == 4 && request.status == 200) {
-                        console.log("Uploaded");
+                    if (request.readyState == 4){
+                        if( request.status == 200) {
+                            console.log("Uploaded", offset, "of", fileName);
+                        }else{
+                            console.log("UploadErr", offset, "of", fileName);
+                        }
+                        window.inflight--;
                     }
                 };
                 request.open('POST', url);
                 request.send(formData);
+                window.inflight++;
             }
 
             function getRandomString() {
