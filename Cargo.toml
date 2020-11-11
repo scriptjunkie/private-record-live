@@ -9,11 +9,12 @@ panic = 'abort'
 lto = true
 
 [dependencies]
-env_logger = "0.5"
-rustls = "0.16"
-actix-web = { version = "2", features=["rustls"] }
-actix-multipart = "0"
-actix-files = "0.2.1"
-actix-rt = "1"
-chrono = "0"
-futures = "0"
+env_logger = "0.5.13"
+rustls = "0.18.1"
+actix-web = { version = "3.2.0", features=["rustls"] }
+actix-multipart = "0.3.0"
+actix-files = "0.4.0"
+actix-rt = "1.1.1"
+actix-tls = { version = "2.0.0", features=["rustls"] }
+chrono = "0.4.19"
+futures = "0.3.8"

@@ -10,7 +10,8 @@ use actix_multipart::Multipart;
 use actix_files::Files;
 use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use rustls::internal::pemfile::{certs, rsa_private_keys, pkcs8_private_keys};
-use rustls::{NoClientAuth, ServerConfig};
+use rustls::NoClientAuth;
+use actix_tls::rustls::ServerConfig;
 use futures::StreamExt;
 use std::fs::OpenOptions;
 
@@ -36,8 +37,7 @@ async fn getHTMLMediaElement_js(_: HttpRequest) -> HttpResponse {
 }
 //File upload - multipart
 async fn up(mut payload: Multipart) -> Result<HttpResponse, Error> {
-    while let Some(item) = payload.next().await {
-        let mut field = item?;
+    while let Some(Ok(mut field)) = payload.next().await {
         if let Some(content_type) = field.content_disposition() {
             if let Some(name_param) = content_type.get_name() {
                 if name_param == "video-blob" {
@@ -114,7 +114,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/style.css").to(style_css))
             .service(web::resource("/getHTMLMediaElement.js").to(getHTMLMediaElement_js))
             .service(web::resource("/getHTMLMediaElement.css").to(getHTMLMediaElement_css))
-            .service(web::resource("/up").to(up))
+            .service(web::resource("/up").route(web::post().to(up)))
             .service(web::resource("/ls").to(ls))
             .service(Files::new("/ups", "ups"))
     })
