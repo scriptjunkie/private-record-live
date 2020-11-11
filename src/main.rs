@@ -10,8 +10,7 @@ use actix_multipart::Multipart;
 use actix_files::Files;
 use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
 use rustls::internal::pemfile::{certs, rsa_private_keys, pkcs8_private_keys};
-use rustls::NoClientAuth;
-use actix_tls::rustls::ServerConfig;
+use rustls::{NoClientAuth, ServerConfig};
 use futures::StreamExt;
 use std::fs::OpenOptions;
 
@@ -114,7 +113,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/style.css").to(style_css))
             .service(web::resource("/getHTMLMediaElement.js").to(getHTMLMediaElement_js))
             .service(web::resource("/getHTMLMediaElement.css").to(getHTMLMediaElement_css))
-            .service(web::resource("/up").route(web::post().to(up)))
+            .service(web::resource("/up").to(up))
             .service(web::resource("/ls").to(ls))
             .service(Files::new("/ups", "ups"))
     })
