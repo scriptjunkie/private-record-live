@@ -114,7 +114,8 @@ by Matthew Weeks 2020-02-20 Built on work by...
                     <option>whammy</option>
                     <option>WebAssembly</option>
                 </select>
-                <a href="ls">Previous Recordings</a>
+                Previous Recordings <a href="#" id="localrecslink">local</a> <a href="ls">server</a>
+                <div id="locallinks"></div>
 
                 <hr style="border-top: 0;border-bottom: 1px solid rgb(189, 189, 189);margin: 4px -12px;margin-top: 8px;">
                 <select class="media-resolutions">
@@ -196,6 +197,29 @@ by Matthew Weeks 2020-02-20 Built on work by...
         </script>
 
         <script>
+            async function makedown(fileName, keys, parentel) {
+                let myarr = [];
+                for(var i = 0; i < keys.length; i++){
+                    let vidurl = '/vidparts/'+fileName+'/'+keys[i];
+                    let bod = await window.myvidcache.match(vidurl);
+                    let bodreader = bod.body.getReader();
+                    while(true){
+                        let donebytesread = await bodreader.read();
+                        if(!donebytesread.value || donebytesread.done){
+                            break;
+                        }
+                        myarr.push(donebytesread.value);
+                    }
+                }
+                let newblob = new Blob(myarr);
+                console.log("read video blob", newblob);
+                let vlink = document.createElement('a');
+                vlink.download = fileName;
+                vlink.appendChild(document.createTextNode(fileName));
+                vlink.href = window.URL.createObjectURL(newblob);
+                parentel.appendChild(vlink);
+                parentel.appendChild(document.createElement("br"));
+            }
             caches.open("vidcache").then(function(cache){
                 window.myvidcache = cache;
                 console.log("opened cache");
@@ -204,10 +228,27 @@ by Matthew Weeks 2020-02-20 Built on work by...
                     keys.forEach(function(request, index, array) {
                         let u = request.url;
                         let parts = u.split("/");
-                        vids[parts[parts.length - 2]] = 1;
-                        //don't do this! cache.delete(request);
+                        let fn = parts[parts.length - 2];
+                        if(!(fn in vids)){
+                            vids[fn] = {};
+                            console.log("cache item", u);
+                        }
+                        vids[fn][parseInt(parts[parts.length - 1])] = 1;
+                        //At some point we should add this ability: cache.delete(request);
                     });
                     console.log("found videos", vids, "from", keys.length, "keys");
+                    localrecslink.addEventListener('click', function(){
+                        console.log("loading local cached vid links");
+                        while(locallinks.childNodes.length > 0){
+                            locallinks.removeChild(locallinks.childNodes[0]);
+						}
+                        for(var vid in vids){
+                            console.log("loading local cached vid link", vid);
+                            var kes = Object.keys(vids[vid]).map((v) => parseInt(v));
+                            kes.sort((a,b) => a > b);
+                            makedown(vid, kes,locallinks);
+                        }
+                    });
                 });
             });
             var video = document.createElement('video');

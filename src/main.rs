@@ -3,9 +3,8 @@ extern crate chrono;
 use chrono::offset::Utc;
 use chrono::DateTime;
 use std::fs::File;
-use std::io::BufReader;
 use std::fs;
-use std::io::Write;
+use std::io::{Seek,Write,BufReader};
 use actix_multipart::Multipart;
 use actix_files::Files;
 use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer};
@@ -36,26 +35,58 @@ async fn getHTMLMediaElement_js(_: HttpRequest) -> HttpResponse {
 }
 //File upload - multipart
 async fn up(mut payload: Multipart) -> Result<HttpResponse, Error> {
+    let mut offset = None;
     while let Some(Ok(mut field)) = payload.next().await {
         if let Some(content_type) = field.content_disposition() {
             if let Some(name_param) = content_type.get_name() {
                 if name_param == "video-blob" {
                     if let Some(filename) = content_type.get_filename() {
-                        if !filename.contains(".."){
-                            let filepath = format!("ups/{}", filename);
-                            // Open output file to create or append
-                            let mut f = web::block(||
+                        if filename.contains(".."){
+                            continue;
+                        }
+                        let filepath = format!("ups/{}", filename);
+                        // Open output file to create or append
+                        let f = if let Some(offs) = offset{
+                            let offsclone = offs;
+                            web::block(move ||
+                                OpenOptions::new().read(true).write(true).create(true).open(filepath).map(|mut f|{
+                                f.seek(std::io::SeekFrom::Start(offsclone)).unwrap();
+                                f
+                                })
+                            )
+                                .await
+                                .unwrap()
+                        } else {
+                            web::block(||
                                 OpenOptions::new().append(true).create(true).open(filepath)
                             )
                                 .await
-                                .unwrap();
-                            // Field in turn is stream of *Bytes* object
-                            while let Some(chunk) = field.next().await {
-                                let data = chunk.unwrap();
-                                // filesystem operations are blocking, we have to use threadpool
-                                f = web::block(move || f.write_all(&data).map(|_| f)).await?;
+                                .unwrap()
+                        };
+                        let (flen, mut f) = web::block(move || f.metadata().map(|m|(m.len(), f))).await.unwrap();
+                        if let Some(offs) = offset{
+                            if offs < flen{
+                                continue; //Not allowed to overwrite bytes
                             }
                         }
+                        // Field in turn is stream of *Bytes* object
+                        while let Some(chunk) = field.next().await {
+                            let data = chunk.unwrap();
+                            // filesystem operations are blocking, we have to use threadpool
+                            f = web::block(move || f.write_all(&data).map(|_| f)).await?;
+                        }
+                    }
+                }else if name_param == "video-offset"{
+                    let mut offset_string = std::string::String::new();
+                    // Field in turn is stream of *Bytes* object
+                    while let Some(chunk) = field.next().await {
+                        let data = chunk.unwrap();
+                        if let Ok(datastr) = std::str::from_utf8(&data){
+                            offset_string.push_str(datastr);
+                        }
+                    }
+                    if let Ok(offset_usize) = offset_string.parse(){
+                        offset = Some(offset_usize);
                     }
                 }
             }
