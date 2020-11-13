@@ -12,7 +12,8 @@ check out this repository somewhere with an updated copy of Rust and `cargo buil
 
 ## Change SSL keys
 Ideally you use valid SSL keys issued by a real certificate authority. Failing that, just
-generate self-signed keys by running `openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365`
+generate self-signed keys by running `openssl genrsa -out key.pem ; openssl req -x509 -key key.pem -out cert.pem -days 365`
+If you get an error, the software might not be able to parse the private key. Convert to RSA format by running `openssl rsa -in keyinpkcs8format.pem -out key.pem`
 
 ## Run it
 Be sure to execute from a directory the program can create and write a subfolder of. Once it's running, go to https://[your_ip]:8443/ and your page should be visible.
