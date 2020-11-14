@@ -11,12 +11,15 @@ OR
 check out this repository somewhere with an updated copy of Rust and `cargo build --release` it
 
 ## Change SSL keys
-Ideally you use valid SSL keys issued by a real certificate authority. Failing that, just
-generate self-signed keys by running `openssl genrsa -out key.pem ; openssl req -x509 -key key.pem -out cert.pem -days 365`
-If you get an error, the software might not be able to parse the private key. Convert to RSA format by running `openssl rsa -in keyinpkcs8format.pem -out key.pem`
+Ideally you use valid SSL keys issued by a real certificate authority. Failing that, just generate self-signed keys by running `openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365` or alternately, if that fails, `openssl genrsa -out key.pem ; openssl req -x509 -key key.pem -out cert.pem -days 365`
+
+If you use an existing keyset, such as keys obtained from a CA, and this fails, you may need to remove password protection or convert format. Try running `openssl rsa -in keyinpkcs8format.pem -out key.pem`
 
 ## Run it
 Be sure to execute from a directory the program can create and write a subfolder of. Once it's running, go to https://[your_ip]:8443/ and your page should be visible.
+
+## Debugging
+Set environment variable RUST_LOG to debug or trace and run the program for verbose debug information.
 
 # Deployment - PHP
 - Drop the .htaccess, PHP, HTML, CSS, and JS files on an Apache PHP host with mod_rewrite and htaccess files enabled

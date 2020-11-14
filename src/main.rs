@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-extern crate chrono;
+#[macro_use] extern crate log;
 use chrono::offset::Utc;
 use chrono::DateTime;
 use std::fs::File;
@@ -127,14 +127,21 @@ async fn main() -> std::io::Result<()> {
     fs::create_dir_all("ups")?; //make uploads folder if not already there
     // load ssl keys
     let mut config = ServerConfig::new(NoClientAuth::new());
+    info!("Trying to open cert.pem and key.pem...");
     let cert_file = &mut BufReader::new(File::open("cert.pem").unwrap());
     let key_file = &mut BufReader::new(File::open("key.pem").unwrap());
     let cert_chain = certs(cert_file).unwrap();
-    let mut keys = rsa_private_keys(key_file).or_else(|_|{
+    let mut keys = rsa_private_keys(key_file).and_then(|keys| if keys.len() == 0 { Err(()) } else { Ok(keys) }).or_else(|_|{
+            println!("Not an RSA key? Trying to decode as PKCS8\n");
             let key_file2 = &mut BufReader::new(File::open("key.pem").unwrap());
             pkcs8_private_keys(key_file2)
         }).unwrap();
+    if keys.len() == 0 {
+        error!("No key loaded! Try generating a self-signed cert in file 'cert.pem' with passwordless key 'key.pem'");
+        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "key.pem"));
+    }
     config.set_single_cert(cert_chain, keys.remove(0)).unwrap();
+    info!("Loaded cert and key - starting server on 0.0.0.0:8443");
 
     HttpServer::new(|| {
         App::new()

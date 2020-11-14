@@ -18,3 +18,4 @@ actix-rt = "1.1.1"
 actix-tls = { version = "2.0.0", features=["rustls"] }
 chrono = "0.4.19"
 futures = "0.3.8"
+log = "0.4.11"
